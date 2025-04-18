@@ -62,6 +62,18 @@ tournaments = response.json()
 print(f"✅ Retrieved {len(tournaments)} tournaments.")
 print(f"🔍 Sample tournament: {tournaments[0] if tournaments else 'No tournaments returned'}")
 
+# Step 3b: Fetch 2025 Tournaments
+print("📡 Fetching 2025 tournaments from SportsData.io...")
+tournament_url_2025 = "https://api.sportsdata.io/golf/v2/json/Tournaments/2025"
+response_2025 = requests.get(tournament_url_2025, headers={"Ocp-Apim-Subscription-Key": API_KEY})
+
+if response_2025.status_code != 200:
+    print(f"❌ Failed to fetch 2025 tournaments: {response_2025.status_code} - {response_2025.text}")
+else:
+    tournaments_2025 = response_2025.json()
+    print(f"✅ Retrieved {len(tournaments_2025)} tournaments for 2025.")
+    tournaments += tournaments_2025  # combine with 2024 data
+
 # Step 4: Insert Tournaments into Supabase
 inserted_tournaments = 0
 for t in tournaments:
@@ -81,3 +93,49 @@ for t in tournaments:
         print(f"⚠️ Failed to insert tournament {data['tournament_id']}: {res.status_code} - {res.text}")
 
 print(f"✅ Finished inserting {inserted_tournaments} new tournaments.")
+
+from datetime import datetime
+
+print("📊 Fetching tournament IDs for results...")
+# Optional: You could filter these from Supabase, but here we assume all tournaments are in memory
+tournament_ids = [t["tournament_id"] for t in tournaments if t.get("start_date") and t["start_date"][:4] >= "2023"]
+
+print(f"🔁 Attempting leaderboard pulls for {len(tournament_ids)} tournaments...")
+
+inserted_results = 0
+
+for tid in tournament_ids:
+    leaderboard_url = f"https://api.sportsdata.io/golf/v2/json/Leaderboard/{tid}"
+    res = requests.get(leaderboard_url, headers={"Ocp-Apim-Subscription-Key": API_KEY})
+
+    if res.status_code != 200:
+        print(f"⚠️ Skipping TID {tid} (no leaderboard yet): {res.status_code}")
+        continue
+
+    data = res.json()
+    players = data.get("Players", [])
+    
+    if not players:
+        print(f"⚠️ No player results for tournament {tid}")
+        continue
+
+    for p in players:
+        result = {
+            "tournament_id": tid,
+            "player_id": p["PlayerID"],
+            "position": p.get("Position", None),
+            "total_score": p.get("TotalScore", None),
+            "round1": p.get("Round1", None),
+            "round2": p.get("Round2", None),
+            "round3": p.get("Round3", None),
+            "round4": p.get("Round4", None),
+            "earnings": p.get("Earnings", None)
+        }
+
+        res_insert = requests.post(f"{SUPABASE_URL}/leaderboard", headers=supabase_headers, json=result)
+        if res_insert.status_code in [201, 204]:
+            inserted_results += 1
+        elif res_insert.status_code != 409:
+            print(f"❌ Insert error for player {p['PlayerID']} in TID {tid}: {res_insert.status_code} - {res_insert.text}")
+
+print(f"✅ Inserted {inserted_results} leaderboard rows.")
