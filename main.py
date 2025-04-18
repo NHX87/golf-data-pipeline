@@ -11,7 +11,7 @@ supabase_headers = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
     "Content-Type": "application/json",
-    "Prefer": "return=minimal"  # safest option for skipping duplicates
+    "Prefer": "resolution=ignore-conflict,return=minimal"
 }
 
 # Step 1: Fetch Players
