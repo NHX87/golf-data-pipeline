@@ -1,56 +1,45 @@
 import requests
+import os
 
-# Replace with your actual API key
-API_KEY = "f3ed870496ea47b38c43a890c298bf5f"
+# Load secrets from GitHub Actions environment variables
+API_KEY = os.environ["SPORTSDATA_API_KEY"]
+SUPABASE_URL = os.environ["SUPABASE_URL"]
+SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 
-# Set up request
+# Step 1: Get player data from SportsData.io
 url = "https://api.sportsdata.io/golf/v2/json/Players"
 headers = {
     "Ocp-Apim-Subscription-Key": API_KEY
 }
 
-# Make the request
 response = requests.get(url, headers=headers)
+if response.status_code != 200:
+    print(f"❌ API error: {response.status_code} - {response.text}")
+    exit()
 
-# Check for success
-if response.status_code == 200:
-    players = response.json()
-    print(f"✅ {len(players)} players returned.")
-    print(players[0])  # Preview the first player object
-else:
-    print(f"❌ API call failed: {response.status_code}")
-    print(response.text)
+players = response.json()
 
-import psycopg2
+# Step 2: Insert into Supabase using REST API
+supabase_headers = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json",
+    "Prefer": "resolution=merge-duplicates"
+}
 
-# Supabase DB connection details
-conn = psycopg2.connect(
-    dbname="postgres",
-    user="postgres",
-    password="D@t@-Rulez!10",
-    host="db.iefmntaduuarxfyqbkds.supabase.co",
-    port="5432"
-)
-cursor = conn.cursor()
-
-# Loop through each player and insert into DB
+inserted = 0
 for p in players:
-    try:
-        player_id = p["PlayerID"]
-        name = f"{p['FirstName']} {p['LastName']}"
-        country = p.get("Country", None)
-        status = "Active"
+    data = {
+        "player_id": p["PlayerID"],
+        "full_name": f"{p['FirstName']} {p['LastName']}",
+        "country": p.get("Country"),
+        "status": "Active"
+    }
 
-        cursor.execute("""
-            INSERT INTO players (player_id, full_name, country, status)
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT (player_id) DO NOTHING;
-        """, (player_id, name, country, status))
+    res = requests.post(f"{SUPABASE_URL}/players", headers=supabase_headers, json=[data])
+    if res.status_code in [201, 204]:
+        inserted += 1
+    else:
+        print(f"⚠️ Failed to insert player {p['PlayerID']}: {res.status_code} - {res.text}")
 
-    except Exception as e:
-        print(f"❌ Error inserting player {p['PlayerID']}: {e}")
-
-conn.commit()
-cursor.close()
-conn.close()
-print("✅ All players inserted.")
+print(f"✅ Inserted {inserted} players.")
