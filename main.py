@@ -26,7 +26,6 @@ if response.status_code != 200:
 players = response.json()
 print(f"✅ Retrieved {len(players)} players.")
 
-# Step 2: Insert Players into Supabase
 inserted_players = 0
 for p in players:
     data = {
@@ -36,11 +35,13 @@ for p in players:
         "status": "Active"
     }
 
-    res = requests.post(f"{SUPABASE_URL}/players", headers=supabase_headers, json=[data])
+    res = requests.post(f"{SUPABASE_URL}/players", headers=supabase_headers, json=data)  # ✅ send as single object
+
     if res.status_code in [201, 204]:
         inserted_players += 1
     elif res.status_code != 409:
         print(f"⚠️ Failed to insert player {data['player_id']}: {res.status_code} - {res.text}")
+
 
 print(f"🎉 Finished: {inserted_players} new players inserted.")
 print("🚀 Moving on to tournament fetch...")
