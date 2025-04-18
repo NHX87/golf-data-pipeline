@@ -6,14 +6,18 @@ API_KEY = os.environ["SPORTSDATA_API_KEY"]
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 
-# Step 1: Call the SportsData.io Players API
-print("📡 Fetching players from SportsData.io...")
-url = "https://api.sportsdata.io/golf/v2/json/Players"
-headers = {
-    "Ocp-Apim-Subscription-Key": API_KEY
+# Supabase headers
+supabase_headers = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json",
+    "Prefer": "return=minimal"  # safest option for skipping duplicates
 }
 
-response = requests.get(url, headers=headers)
+# Step 1: Fetch Players
+print("📡 Fetching players from SportsData.io...")
+player_url = "https://api.sportsdata.io/golf/v2/json/Players"
+response = requests.get(player_url, headers={"Ocp-Apim-Subscription-Key": API_KEY})
 
 if response.status_code != 200:
     print(f"❌ Failed to fetch players: {response.status_code} - {response.text}")
@@ -22,15 +26,8 @@ if response.status_code != 200:
 players = response.json()
 print(f"✅ Retrieved {len(players)} players.")
 
-# Step 2: Insert into Supabase using REST API
-supabase_headers = {
-    "apikey": SUPABASE_KEY,
-    "Authorization": f"Bearer {SUPABASE_KEY}",
-    "Content-Type": "application/json",
-    "Prefer": "resolution=merge-duplicates, return=minimal"
-}
-
-inserted = 0
+# Step 2: Insert Players into Supabase
+inserted_players = 0
 for p in players:
     data = {
         "player_id": p["PlayerID"],
@@ -39,23 +36,19 @@ for p in players:
         "status": "Active"
     }
 
-    print(f"📥 Inserting: {data['full_name']} ({data['player_id']})")
-
     res = requests.post(f"{SUPABASE_URL}/players", headers=supabase_headers, json=[data])
     if res.status_code in [201, 204]:
-        inserted += 1
-    else:
-        print(f"⚠️ Failed to insert {data['player_id']}: {res.status_code} - {res.text}")
+        inserted_players += 1
+    elif res.status_code != 409:
+        print(f"⚠️ Failed to insert player {data['player_id']}: {res.status_code} - {res.text}")
 
-print(f"🎉 Finished: {inserted} players inserted successfully.")
+print(f"🎉 Finished: {inserted_players} new players inserted.")
+print("🚀 Moving on to tournament fetch...")
 
-# Step 3: Call the SportsData.io Tournament API 
+# Step 3: Fetch Tournaments
 print("📡 Fetching tournaments from SportsData.io...")
-url = "https://api.sportsdata.io/golf/v2/json/Tournaments/2024"
-headers = {
-    "Ocp-Apim-Subscription-Key": API_KEY
-}
-response = requests.get(url, headers=headers)
+tournament_url = "https://api.sportsdata.io/golf/v2/json/Tournaments/2024"
+response = requests.get(tournament_url, headers={"Ocp-Apim-Subscription-Key": API_KEY})
 
 if response.status_code != 200:
     print(f"❌ Failed to fetch tournaments: {response.status_code} - {response.text}")
@@ -64,11 +57,9 @@ if response.status_code != 200:
 tournaments = response.json()
 print(f"✅ Retrieved {len(tournaments)} tournaments.")
 print(f"🔍 Sample tournament: {tournaments[0] if tournaments else 'No tournaments returned'}")
-print(f"🔁 Attempting to insert {len(tournaments)} tournaments...")
 
 # Step 4: Insert Tournaments into Supabase
 inserted_tournaments = 0
-
 for t in tournaments:
     data = {
         "tournament_id": t["TournamentID"],
@@ -79,21 +70,10 @@ for t in tournaments:
         "location": t.get("Location", None)
     }
 
-    print(f"📅 Inserting tournament: {data['name']} ({data['tournament_id']})")
-
     res = requests.post(f"{SUPABASE_URL}/tournaments", headers=supabase_headers, json=[data])
     if res.status_code in [201, 204]:
         inserted_tournaments += 1
-    else:
+    elif res.status_code != 409:
         print(f"⚠️ Failed to insert tournament {data['tournament_id']}: {res.status_code} - {res.text}")
 
-print(f"✅ Finished inserting {inserted_tournaments} tournaments.")
-
-    res = requests.post(f"{SUPABASE_URL}/tournaments", headers=supabase_headers, json=[data])
-    if res.status_code in [201, 204]:
-        inserted_tournaments += 1
-    else:
-        print(f"⚠️ Failed to insert tournament {data['tournament_id']}: {res.status_code} - {res.text}")
-
-print(f"✅ Finished inserting {inserted_tournaments} tournaments.")
-
+print(f"✅ Finished inserting {inserted_tournaments} new tournaments.")
