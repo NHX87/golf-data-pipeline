@@ -145,7 +145,7 @@ for tid in tournament_ids:
             "earnings": p.get("Earnings", None)
         }
 
-        res_insert = requests.post(f"{SUPABASE_URL}/leaderboard", headers=supabase_headers, json=result)
+        res_insert = requests.post(f"{SUPABASE_URL}/results", headers=supabase_headers, json=result)
         if res_insert.status_code in [201, 204]:
             inserted_results += 1
         elif res_insert.status_code != 409:
