@@ -96,9 +96,10 @@ print(f"✅ Finished inserting {inserted_tournaments} new tournaments.")
 
 from datetime import datetime
 
+# Step 5: fetching tournament results
 print("📊 Fetching tournament IDs for results...")
 # Optional: You could filter these from Supabase, but here we assume all tournaments are in memory
-tournament_ids = [t["tournament_id"] for t in tournaments if t.get("start_date") and t["start_date"][:4] >= "2023"]
+tournament_ids = [t["tournament_id"] for t in tournaments if t.get("start_date") and t["start_date"][:4] >= "2024"]
 
 print(f"🔁 Attempting leaderboard pulls for {len(tournament_ids)} tournaments...")
 
