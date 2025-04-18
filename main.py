@@ -55,14 +55,16 @@ url = "https://api.sportsdata.io/golf/v2/json/Tournaments/2024"
 headers = {
     "Ocp-Apim-Subscription-Key": API_KEY
 }
-response = requests.get(url, headers=headers)  # ✅ FIXED: `requests`, not `request`
+response = requests.get(url, headers=headers)
 
 if response.status_code != 200:
-    print(f"❌ Failed to fetch tournaments: {response.status_code} - {response.text}")  # ✅ FIXED: spelling of response
+    print(f"❌ Failed to fetch tournaments: {response.status_code} - {response.text}")
     exit(1)
 
 tournaments = response.json()
 print(f"✅ Retrieved {len(tournaments)} tournaments.")
+print(f"🔍 Sample tournament: {tournaments[0] if tournaments else 'No tournaments returned'}")
+print(f"🔁 Attempting to insert {len(tournaments)} tournaments...")
 
 # Step 4: Insert Tournaments into Supabase
 inserted_tournaments = 0
@@ -78,6 +80,14 @@ for t in tournaments:
     }
 
     print(f"📅 Inserting tournament: {data['name']} ({data['tournament_id']})")
+
+    res = requests.post(f"{SUPABASE_URL}/tournaments", headers=supabase_headers, json=[data])
+    if res.status_code in [201, 204]:
+        inserted_tournaments += 1
+    else:
+        print(f"⚠️ Failed to insert tournament {data['tournament_id']}: {res.status_code} - {res.text}")
+
+print(f"✅ Finished inserting {inserted_tournaments} tournaments.")
 
     res = requests.post(f"{SUPABASE_URL}/tournaments", headers=supabase_headers, json=[data])
     if res.status_code in [201, 204]:
