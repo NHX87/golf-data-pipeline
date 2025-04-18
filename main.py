@@ -47,9 +47,6 @@ for p in players:
 
 print(f"🎉 Finished: {inserted_players} new players inserted.")
 
-
-
-print(f"🎉 Finished: {inserted_players} new players inserted.")
 print("🚀 Moving on to tournament fetch...")
 
 # Step 3: Fetch Tournaments
