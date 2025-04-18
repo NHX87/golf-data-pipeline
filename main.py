@@ -134,16 +134,18 @@ for tid in tournament_ids:
 
     for p in players:
         result = {
-            "tournament_id": tid,
-            "player_id": p["PlayerID"],
-            "position": p.get("Position", None),
-            "total_score": p.get("TotalScore", None),
-            "round1": p.get("Round1", None),
-            "round2": p.get("Round2", None),
-            "round3": p.get("Round3", None),
-            "round4": p.get("Round4", None),
-            "earnings": p.get("Earnings", None)
+        "tournament_id": tid,
+        "player_id": p["PlayerID"],
+        "position": p.get("Position"),
+        "score": p.get("TotalScore"),  # was total_score
+        "earnings": p.get("Earnings"),  # if your schema kept 'earning'
+        "round_1_score": p.get("Round1"),
+        "round_2_score": p.get("Round2"),
+        "round_3_score": p.get("Round3"),
+        "round_4_score": p.get("Round4")
         }
+
+    
 
         res_insert = requests.post(f"{SUPABASE_URL}/results", headers=supabase_headers, json=result)
         if res_insert.status_code in [201, 204]:
