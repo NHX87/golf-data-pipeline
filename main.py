@@ -1,23 +1,26 @@
 import requests
 import os
 
-# Load secrets from GitHub Actions environment variables
+# Load environment variables from GitHub secrets
 API_KEY = os.environ["SPORTSDATA_API_KEY"]
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 
-# Step 1: Get player data from SportsData.io
+# Step 1: Call the SportsData.io Players API
+print("📡 Fetching players from SportsData.io...")
 url = "https://api.sportsdata.io/golf/v2/json/Players"
 headers = {
     "Ocp-Apim-Subscription-Key": API_KEY
 }
 
 response = requests.get(url, headers=headers)
+
 if response.status_code != 200:
-    print(f"❌ API error: {response.status_code} - {response.text}")
-    exit()
+    print(f"❌ Failed to fetch players: {response.status_code} - {response.text}")
+    exit(1)
 
 players = response.json()
+print(f"✅ Retrieved {len(players)} players.")
 
 # Step 2: Insert into Supabase using REST API
 supabase_headers = {
@@ -36,10 +39,12 @@ for p in players:
         "status": "Active"
     }
 
+    print(f"📥 Inserting: {data['full_name']} ({data['player_id']})")
+
     res = requests.post(f"{SUPABASE_URL}/players", headers=supabase_headers, json=[data])
     if res.status_code in [201, 204]:
         inserted += 1
     else:
-        print(f"⚠️ Failed to insert player {p['PlayerID']}: {res.status_code} - {res.text}")
+        print(f"⚠️ Failed to insert {data['player_id']}: {res.status_code} - {res.text}")
 
-print(f"✅ Inserted {inserted} players.")
+print(f"🎉 Finished: {inserted} players inserted successfully.")
