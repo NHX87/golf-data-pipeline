@@ -66,7 +66,7 @@ next_month = today + timedelta(days=45)
 filtered_tournaments = []
 for t in tournaments:
     if t.get("StartDate"):
-        start_date = datetime.strptime(t["StartDate"], "%Y-%m-%d").date()
+        start_date = datetime.fromisoformat(t["StartDate"]).date()
         if today <= start_date <= next_month:
             filtered_tournaments.append(t)
 
@@ -78,8 +78,9 @@ for t in filtered_tournaments:
     start_date = t.get("StartDate")
     end_date = t.get("EndDate")
 
-    start_date_dt = datetime.strptime(start_date, "%Y-%m-%d").date() if start_date else None
-    end_date_dt = datetime.strptime(end_date, "%Y-%m-%d").date() if end_date else None
+    start_date_dt = datetime.fromisoformat(start_date).date() if start_date else None
+    end_date_dt = datetime.fromisoformat(end_date).date() if end_date else None
+
 
     if start_date_dt and today < start_date_dt:
         status = "upcoming"
