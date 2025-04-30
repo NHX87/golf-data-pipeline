@@ -58,6 +58,13 @@ else:
 
 print(f"🔁 Pulling leaderboards for {len(tournaments)} tournaments...")
 
+# TEMP SANITY CHECK – override tournaments to known valid ones
+tournaments = [
+    {"tournament_id": 58, "status": "completed"},
+    {"tournament_id": 61, "status": "completed"},
+    {"tournament_id": 65, "status": "completed"}
+]
+
 # 4. Fetch leaderboard + results
 inserted_results = 0
 inserted_leaderboards = 0
