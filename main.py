@@ -2,12 +2,12 @@ import requests
 import os
 from datetime import datetime
 
-# Load environment variables from GitHub secrets
+# Load secrets from GitHub Actions
 API_KEY = os.environ["SPORTSDATA_API_KEY"]
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 
-# Set headers
+# Headers
 headers = {
     "Ocp-Apim-Subscription-Key": API_KEY
 }
@@ -20,9 +20,7 @@ supabase_headers = {
 
 # 1. Fetch Players
 print("📡 Fetching players from SportsData.io...")
-player_url = "https://api.sportsdata.io/golf/v2/json/Players"
-response = requests.get(player_url, headers=headers)
-
+response = requests.get("https://api.sportsdata.io/golf/v2/json/Players", headers=headers)
 if response.status_code != 200:
     print(f"❌ Failed to fetch players: {response.status_code} - {response.text}")
     exit(1)
@@ -44,10 +42,11 @@ for p in players:
         inserted_players += 1
 print(f"🎉 Finished inserting {inserted_players} new players.")
 
-# 3. Fetch tournament IDs and status from Supabase
-print("📊 Fetching completed & in-progress tournaments from Supabase...")
+# 3. Fetch tournaments from Supabase (completed or in_progress, and end_date in the past)
+today_str = str(datetime.utcnow().date())
+print("📊 Fetching completed & in-progress tournaments with past end dates from Supabase...")
 res = requests.get(
-    f"{SUPABASE_URL}/tournaments?select=tournament_id,status&or=(status.eq.completed,status.eq.in_progress)",
+    f"{SUPABASE_URL}/tournaments?select=tournament_id,status,end_date&or=(status.eq.completed,status.eq.in_progress)&end_date=lt.{today_str}",
     headers=supabase_headers
 )
 
@@ -59,7 +58,7 @@ else:
 
 print(f"🔁 Pulling leaderboards for {len(tournaments)} tournaments...")
 
-# 4. Fetch and insert leaderboard + results
+# 4. Fetch leaderboard + results
 inserted_results = 0
 inserted_leaderboards = 0
 
@@ -67,9 +66,10 @@ for t in tournaments:
     tid = t["tournament_id"]
     status = t["status"]
 
+    # Use correct endpoint based on tournament status
     if status == "completed":
         leaderboard_url = f"https://api.sportsdata.io/golf/v2/json/LeaderboardFinal/{tid}"
-    else:  # in_progress
+    else:
         leaderboard_url = f"https://api.sportsdata.io/golf/v2/json/Leaderboard/{tid}"
 
     res = requests.get(leaderboard_url, headers=headers)
@@ -117,4 +117,3 @@ for t in tournaments:
 
 print(f"✅ Inserted {inserted_results} player results.")
 print(f"✅ Inserted {inserted_leaderboards} tournament leaderboard summaries.")
-
