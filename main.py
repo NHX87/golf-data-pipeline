@@ -1,6 +1,6 @@
 import requests
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # Load environment variables from GitHub secrets
 API_KEY = os.environ["SPORTSDATA_API_KEY"]
@@ -44,95 +44,34 @@ for p in players:
         inserted_players += 1
 print(f"🎉 Finished inserting {inserted_players} new players.")
 
-# 3. Fetch Tournaments (2023, 2024, 2025)
-print("📡 Fetching tournaments...")
-tournament_urls = [
-    "https://api.sportsdata.io/golf/v2/json/Tournaments/2023",
-    "https://api.sportsdata.io/golf/v2/json/Tournaments/2024",
-    "https://api.sportsdata.io/golf/v2/json/Tournaments/2025",
-]
-
-tournaments = []
-for url in tournament_urls:
-    response = requests.get(url, headers=headers)
-    if response.status_code == 200:
-        tournaments += response.json()
-    else:
-        print(f"⚠️ Failed to fetch tournaments: {response.status_code}")
-
-print(f"✅ Retrieved {len(tournaments)} tournaments combined.")
-
-# 4. Filter Completed and In-Progress Tournaments Only
-today = datetime.utcnow().date()
-filtered_tournaments = []
-
-for t in tournaments:
-    start_date = datetime.fromisoformat(t["StartDate"]).date() if t.get("StartDate") else None
-    end_date = datetime.fromisoformat(t["EndDate"]).date() if t.get("EndDate") else None
-
-    if start_date and end_date:
-        if start_date <= today <= end_date:
-            filtered_tournaments.append(t)  # in-progress
-        elif end_date < today:
-            filtered_tournaments.append(t)  # completed
-
-print(f"📅 {len(filtered_tournaments)} tournaments are completed or in-progress.")
-
-# 5. Insert Tournaments
-inserted_tournaments = 0
-for t in filtered_tournaments:
-    start_date = t.get("StartDate")
-    end_date = t.get("EndDate")
-
-    start_date_dt = datetime.fromisoformat(start_date).date() if start_date else None
-    end_date_dt = datetime.fromisoformat(end_date).date() if end_date else None
-
-    if start_date_dt and today < start_date_dt:
-        status = "upcoming"
-    elif start_date_dt and end_date_dt and start_date_dt <= today <= end_date_dt:
-        status = "in_progress"
-    elif end_date_dt and today > end_date_dt:
-        status = "completed"
-    else:
-        status = "unknown"
-
-    data = {
-        "tournament_id": t["TournamentID"],
-        "name": t["Name"],
-        "tour": t.get("Tour"),
-        "start_date": start_date,
-        "end_date": end_date,
-        "location": t.get("Location"),
-        "status": status
-    }
-    res = requests.post(f"{SUPABASE_URL}/tournaments", headers=supabase_headers, json=data)
-    if res.status_code in [201, 204]:
-        inserted_tournaments += 1
-
-print(f"✅ Inserted {inserted_tournaments} tournaments.")
-
-# 6. Fetch tournament IDs from Supabase (filtering for completed and in-progress)
-print("📊 Fetching tournaments with status = completed or in_progress from Supabase...")
+# 3. Fetch tournament IDs and status from Supabase
+print("📊 Fetching completed & in-progress tournaments from Supabase...")
 res = requests.get(
-    f"{SUPABASE_URL}/tournaments?select=tournament_id&or=(status.eq.completed,status.eq.in_progress)",
+    f"{SUPABASE_URL}/tournaments?select=tournament_id,status&or=(status.eq.completed,status.eq.in_progress)",
     headers=supabase_headers
 )
 
 if res.status_code != 200:
-    print(f"❌ Failed to fetch tournament IDs: {res.status_code} - {res.text}")
-    tournament_ids = []
+    print(f"❌ Failed to fetch tournaments: {res.status_code} - {res.text}")
+    tournaments = []
 else:
-    supabase_tournaments = res.json()
-    tournament_ids = [t["tournament_id"] for t in supabase_tournaments]
+    tournaments = res.json()
 
-print(f"🔁 Pulling leaderboards for {len(tournament_ids)} tournaments...")
+print(f"🔁 Pulling leaderboards for {len(tournaments)} tournaments...")
 
-# 7. Pull Leaderboards → Insert into Results and Leaderboard
+# 4. Fetch and insert leaderboard + results
 inserted_results = 0
 inserted_leaderboards = 0
 
-for tid in tournament_ids:
-    leaderboard_url = f"https://api.sportsdata.io/golf/v2/json/Leaderboard/{tid}"
+for t in tournaments:
+    tid = t["tournament_id"]
+    status = t["status"]
+
+    if status == "completed":
+        leaderboard_url = f"https://api.sportsdata.io/golf/v2/json/LeaderboardFinal/{tid}"
+    else:  # in_progress
+        leaderboard_url = f"https://api.sportsdata.io/golf/v2/json/Leaderboard/{tid}"
+
     res = requests.get(leaderboard_url, headers=headers)
 
     if res.status_code != 200:
@@ -167,7 +106,7 @@ for tid in tournament_ids:
     leaderboard_entry = {
         "event_id": tid,
         "sport": "golf",
-        "status": "completed",  # could be made dynamic later
+        "status": status,
         "winner_id": players[0]["PlayerID"],
         "winning_score": players[0]["TotalScore"],
         "players_count": len(players)
@@ -178,3 +117,4 @@ for tid in tournament_ids:
 
 print(f"✅ Inserted {inserted_results} player results.")
 print(f"✅ Inserted {inserted_leaderboards} tournament leaderboard summaries.")
+
