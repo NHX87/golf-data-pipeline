@@ -1,3 +1,4 @@
+
 import requests
 import os
 from datetime import datetime
@@ -45,7 +46,7 @@ print(f"🎉 Finished inserting {inserted_players} new players.")
 # 3. Pull completed tournaments directly from SportsData.io
 print("📡 Pulling completed tournaments directly from SportsData.io...")
 
-years = [2023, 2024, 2025]
+years = [2024, 2025]
 tournament_ids = []
 
 for year in years:
@@ -61,7 +62,7 @@ for year in years:
 
 print(f"✅ Retrieved {len(tournament_ids)} completed tournaments with results.")
 
-# 4. Fetch leaderboard + results
+# 4. Fetch leaderboard + results + rounds + holes
 inserted_results = 0
 inserted_leaderboards = 0
 
@@ -80,31 +81,79 @@ for tid in tournament_ids:
         print(f"⚠️ No players for tournament {tid}")
         continue
 
-    # Insert player results
     for p in players:
         result = {
             "tournament_id": tid,
-            "player_id": p["PlayerID"],
+            "player_id": p.get("PlayerID"),
             "position": p.get("Position"),
             "score": p.get("TotalScore"),
             "earnings": p.get("Earnings"),
             "round_1_score": p.get("Round1"),
             "round_2_score": p.get("Round2"),
             "round_3_score": p.get("Round3"),
-            "round_4_score": p.get("Round4")
+            "round_4_score": p.get("Round4"),
+            "player_tournament_id": p.get("PlayerTournamentID"),
+            "total_strokes": p.get("TotalStrokes"),
+            "fantasy_points": p.get("FantasyPoints"),
+            "fedex_points": p.get("FedExPoints"),
+            "made_cut": p.get("MadeCut"),
+            "win": p.get("Win"),
+            "position_description": p.get("TournamentStatus"),
+            "created_at": datetime.utcnow().isoformat()
         }
         res_result = requests.post(f"{SUPABASE_URL}/results", headers=supabase_headers, json=result)
         if res_result.status_code in [201, 204]:
             inserted_results += 1
 
-    # Insert leaderboard summary
+        for round in p.get("Rounds", []):
+            round_data = {
+                "player_tournament_id": p.get("PlayerTournamentID"),
+                "round_number": round.get("Number"),
+                "score": round.get("Score"),
+                "tee_time": round.get("TeeTime"),
+                "bogey_free": round.get("BogeyFree"),
+                "birdies": round.get("Birdies"),
+                "pars": round.get("Pars"),
+                "bogeys": round.get("Bogeys"),
+                "double_bogeys": round.get("DoubleBogeys"),
+                "worse_than_double_bogey": round.get("WorseThanDoubleBogey"),
+                "triple_bogeys": round.get("TripleBogeys"),
+                "hole_in_ones": round.get("HoleInOnes"),
+                "bounce_back_count": round.get("BounceBackCount"),
+                "longest_birdie_streak": round.get("LongestBirdieOrBetterStreak"),
+                "includes_five_plus_birdies": round.get("IncludesFiveOrMoreBirdiesOrBetter"),
+                "player_id": p.get("PlayerID"),
+                "created_at": datetime.utcnow().isoformat()
+            }
+            res_round = requests.post(f"{SUPABASE_URL}/player_rounds", headers=supabase_headers, json=round_data)
+
+            for hole in round.get("Holes", []):
+                hole_data = {
+                    "player_round_id": round.get("PlayerRoundID"),
+                    "hole_number": hole.get("Number"),
+                    "par": hole.get("Par"),
+                    "score": hole.get("Score"),
+                    "to_par": hole.get("ToPar"),
+                    "is_par": hole.get("IsPar"),
+                    "birdie": hole.get("Birdie"),
+                    "bogey": hole.get("Bogey"),
+                    "double_bogey": hole.get("DoubleBogey"),
+                    "worse_than_double_bogey": hole.get("WorseThanDoubleBogey"),
+                    "hole_in_one": hole.get("HoleInOne"),
+                    "eagle": hole.get("Eagle"),
+                    "double_eagle": hole.get("DoubleEagle"),
+                    "player_id": p.get("PlayerID")
+                }
+                requests.post(f"{SUPABASE_URL}/player_holes", headers=supabase_headers, json=hole_data)
+
     leaderboard_entry = {
-        "event_id": tid,
+        "tournament_id": tid,
         "sport": "golf",
         "status": "completed",
-        "winner_id": players[0]["PlayerID"],
-        "winning_score": players[0]["TotalScore"],
-        "players_count": len(players)
+        "winner_id": players[0].get("PlayerID"),
+        "winning_score": players[0].get("TotalScore"),
+        "players_count": len(players),
+        "updated_at": datetime.utcnow().isoformat()
     }
     res_leaderboard = requests.post(f"{SUPABASE_URL}/leaderboard", headers=supabase_headers, json=leaderboard_entry)
     if res_leaderboard.status_code in [201, 204]:
@@ -112,3 +161,4 @@ for tid in tournament_ids:
 
 print(f"✅ Inserted {inserted_results} player results.")
 print(f"✅ Inserted {inserted_leaderboards} tournament leaderboard summaries.")
+
