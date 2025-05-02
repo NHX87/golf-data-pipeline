@@ -2,7 +2,7 @@ import requests
 import os
 from datetime import datetime
 
-# Load secrets from GitHub Actions
+# Load environment variables
 API_KEY = os.environ["SPORTSDATA_API_KEY"]
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -42,43 +42,31 @@ for p in players:
         inserted_players += 1
 print(f"🎉 Finished inserting {inserted_players} new players.")
 
-# 3. Fetch tournaments from Supabase (completed or in_progress, and end_date in the past)
-today_str = str(datetime.utcnow().date())
-print("📊 Fetching completed & in-progress tournaments with past end dates from Supabase...")
-res = requests.get(
-    f"{SUPABASE_URL}/tournaments?select=tournament_id,status,end_date&or=(status.eq.completed,status.eq.in_progress)&end_date=lt.{today_str}",
-    headers=supabase_headers
-)
+# 3. Pull completed tournaments directly from SportsData.io
+print("📡 Pulling completed tournaments directly from SportsData.io...")
 
-if res.status_code != 200:
-    print(f"❌ Failed to fetch tournaments: {res.status_code} - {res.text}")
-    tournaments = []
-else:
-    tournaments = res.json()
+years = [2023, 2024, 2025]
+tournament_ids = []
 
-print(f"🔁 Pulling leaderboards for {len(tournaments)} tournaments...")
+for year in years:
+    res = requests.get(f"https://api.sportsdata.io/golf/v2/json/Tournaments/{year}", headers=headers)
+    if res.status_code != 200:
+        print(f"⚠️ Failed to fetch tournaments for {year}: {res.status_code}")
+        continue
 
-# TEMP SANITY CHECK – override tournaments to known valid ones
-tournaments = [
-    {"tournament_id": 58, "status": "completed"},
-    {"tournament_id": 61, "status": "completed"},
-    {"tournament_id": 65, "status": "completed"}
-]
+    all_tournaments = res.json()
+    for t in all_tournaments:
+        if t.get("IsOver") is True:
+            tournament_ids.append(t["TournamentID"])
+
+print(f"✅ Retrieved {len(tournament_ids)} completed tournaments with results.")
 
 # 4. Fetch leaderboard + results
 inserted_results = 0
 inserted_leaderboards = 0
 
-for t in tournaments:
-    tid = t["tournament_id"]
-    status = t["status"]
-
-    # Use correct endpoint based on tournament status
-    if status == "completed":
-        leaderboard_url = f"https://api.sportsdata.io/golf/v2/json/LeaderboardFinal/{tid}"
-    else:
-        leaderboard_url = f"https://api.sportsdata.io/golf/v2/json/Leaderboard/{tid}"
-
+for tid in tournament_ids:
+    leaderboard_url = f"https://api.sportsdata.io/golf/v2/json/LeaderboardFinal/{tid}"
     res = requests.get(leaderboard_url, headers=headers)
 
     if res.status_code != 200:
@@ -113,7 +101,7 @@ for t in tournaments:
     leaderboard_entry = {
         "event_id": tid,
         "sport": "golf",
-        "status": status,
+        "status": "completed",
         "winner_id": players[0]["PlayerID"],
         "winning_score": players[0]["TotalScore"],
         "players_count": len(players)
